@@ -1,5 +1,5 @@
 {
-  "simulate_hardware": true,
+  "simulate_hardware": false,
   "gpio_chip": "gpiochip0",
   "dht_pin": 17,
   "ultrasonic_trigger_pin": 23,
@@ -11,4 +11,3 @@
   "poll_interval_ms": 1000,
   "database_path": "../data/device.db"
 }
-
