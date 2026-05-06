@@ -1,81 +1,94 @@
-# iot_device_full
+# Smart Home — Raspberry Pi
+## Зависимости, сборка и запуск
 
-Учебный IoT-проект: C++-ядро собирает телеметрию и пишет ее в SQLite, Flask показывает данные в web-интерфейсе.  
-Для студентов основной сценарий запуска — через Docker.
-
-## Быстрый старт (рекомендуется)
-
-### Windows (PowerShell)
-
-Из корня проекта:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\docker_up.ps1
-```
-
-После старта:
-- Web UI: `http://localhost:8080`
-- noVNC: `http://localhost:6080/vnc.html`
-
-Остановить:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\docker_down.ps1
-```
-
-### Linux/macOS
-
-Из корня проекта:
+### 1. Установка зависимостей
 
 ```bash
-bash ./scripts/docker_up.sh
+# pigpio — GPIO-библиотека
+sudo apt update
+sudo apt install -y pigpio libpigpio-dev
+
+# cpp-httplib — header-only, скачиваем один файл
+wget -O httplib.h \
+  https://raw.githubusercontent.com/yhirose/cpp-httplib/master/httplib.h
 ```
 
-После старта:
-- Web UI: `http://localhost:8080`
-- noVNC: `http://localhost:6080/vnc.html`
+### 2. Структура проекта
 
-Остановить:
+```
+smart_home/
+├── main.cpp       ← C++ сервер
+├── httplib.h      ← скаченный выше header
+└── index.html     ← веб-интерфейс
+```
+
+### 3. Компиляция
 
 ```bash
-bash ./scripts/docker_down.sh
+g++ -std=c++17 -O2 -o smart_home main.cpp -lpigpio -lpthread
 ```
 
-## Что делает Docker-сценарий
-
-- Собирает образ из `docker/Dockerfile`.
-- Поднимает контейнер по `docker/docker-compose.yml`.
-- Автоматически создает `docker/.env` из `docker/.env.example`, если файла нет.
-- Внутри контейнера запускаются:
-  - C++ core (`iot_device_core`);
-  - Flask web (`web/app.py`);
-  - VNC + noVNC для GUI-лаборатории.
-
-## Базовые команды Docker вручную
-
-Если нужно запускать без скриптов:
+### 4. Запуск
 
 ```bash
-docker compose -f docker/docker-compose.yml up --build -d
-docker compose -f docker/docker-compose.yml logs -f
-docker compose -f docker/docker-compose.yml down
+# pigpio требует root
+sudo ./smart_home
 ```
 
-## Частые проблемы
+Открыть в браузере планшета:
+```
+http://<IP-адрес-Raspberry-Pi>:8080
+```
 
-- **Docker daemon недоступен**  
-  Запустите Docker Desktop / Docker Engine и повторите команду.
+Узнать IP: `hostname -I`
 
-- **Порты заняты (`6080` или `8080`)**  
-  Освободите порты или измените проброс в `docker/docker-compose.yml`.
+### 5. Автозапуск (systemd)
 
-- **Долго собирается образ при первом запуске**  
-  Это нормально: устанавливаются системные зависимости и собирается C++-часть.
+```bash
+sudo nano /etc/systemd/system/smarthome.service
+```
 
-## Структура проекта (кратко)
+```ini
+[Unit]
+Description=Smart Home Server
+After=network.target
 
-- `device_core/` — C++ ядро устройства.
-- `web/` — Flask-интерфейс и API.
-- `sql/` — схема базы данных.
-- `docker/` — Docker-инфраструктура запуска.
-- `scripts/` — кросс-платформенные команды запуска/остановки.
+[Service]
+ExecStart=/home/pi/smart_home/smart_home
+WorkingDirectory=/home/pi/smart_home
+Restart=always
+User=root
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl enable smarthome
+sudo systemctl start smarthome
+```
+
+---
+
+### GPIO-схема подключения
+
+| Компонент           | GPIO | Pin (физ.) |
+|---------------------|------|------------|
+| DHT22 (данные)      | 17   | 11         |
+| LDR-модуль (D0)     | 27   | 13         |
+| Реле (шторы)        | 22   | 15         |
+| LED  (лампочка)     | 18   | 12         |
+
+> Питание DHT22: 3.3 В + подтягивающий резистор 4.7 kΩ между DATA и VCC.
+> Реле-модуль: обычно питается от 5 В, управляется 3.3 В GPIO — уточните под свой модуль.
+
+### REST API
+
+| Метод | Путь                   | Описание                        |
+|-------|------------------------|---------------------------------|
+| GET   | `/`                    | Возвращает index.html           |
+| GET   | `/api/sensors`         | JSON: temp, light, curtains, lamp |
+| POST  | `/api/toggle/curtains` | Переключить реле (шторы)        |
+| POST  | `/api/toggle/lamp`     | Переключить LED (лампочку)      |
+| POST  | `/api/curtains`        | Тело: `{"state":true}`          |
+| POST  | `/api/lamp`            | Тело: `{"state":true}`          |
