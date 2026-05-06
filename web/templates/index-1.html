@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Умный Дом</title>
+<style>
+  /* ── Google Fonts ────────────────────────────────────────────────────── */
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@300;400;600&display=swap');
+
+  /* ── Variables ──────────────────────────────────────────────────────── */
+  :root {
+    --bg:         #0c0f14;
+    --surface:    #13181f;
+    --border:     #1e2530;
+    --accent:     #e8c84a;        /* warm gold */
+    --accent2:    #4ab8e8;        /* cool teal */
+    --accent3:    #e84a6a;        /* red for off state */
+    --text:       #d6dce6;
+    --muted:      #5a6475;
+    --on-color:   #e8c84a;
+    --off-color:  #2c3340;
+    --glow:       rgba(232, 200, 74, 0.18);
+    --glow2:      rgba(74, 184, 232, 0.18);
+  }
+
+  /* ── Reset ───────────────────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 100%; height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Barlow', sans-serif;
+    font-weight: 300;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* ── Layout ──────────────────────────────────────────────────────────── */
+  #app {
+    display: grid;
+    grid-template-rows: 1fr 2fr;
+    height: 100vh;
+    width: 100vw;
+    padding: 0;
+  }
+
+  /* ── TOP — clock ─────────────────────────────────────────────────────── */
+  #clock-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+    gap: 6px;
+    padding: 12px 24px;
+  }
+
+  /* subtle noise texture overlay */
+  #clock-panel::before {
+    content: '';
+    position: absolute; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    opacity: 0.6;
+  }
+
+  /* horizontal accent line behind clock */
+  #clock-panel::after {
+    content: '';
+    position: absolute;
+    left: 5%; right: 5%; bottom: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0.5;
+  }
+
+  #time {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(72px, 14vw, 160px);
+    letter-spacing: 0.06em;
+    color: var(--accent);
+    text-shadow: 0 0 40px var(--glow), 0 0 80px rgba(232,200,74,0.08);
+    line-height: 1;
+    transition: text-shadow 0.3s;
+  }
+
+  #date {
+    font-size: clamp(13px, 2.2vw, 22px);
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 400;
+  }
+
+  #sensor-strip {
+    display: flex;
+    gap: 28px;
+    font-size: clamp(10px, 1.6vw, 15px);
+    color: var(--muted);
+    letter-spacing: 0.12em;
+  }
+
+  #sensor-strip span { color: var(--text); font-weight: 600; }
+
+  /* ── BOTTOM — 3 widgets ───────────────────────────────────────────────── */
+  #widgets {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    height: 100%;
+  }
+
+  .widget {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    padding: 32px 20px;
+    position: relative;
+    border-right: 1px solid var(--border);
+    transition: background 0.4s;
+  }
+  .widget:last-child { border-right: none; }
+
+  .widget-label {
+    font-size: clamp(9px, 1.4vw, 13px);
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 600;
+  }
+
+  /* ── Temperature widget ──────────────────────────────────────────────── */
+  #widget-temp .temp-value {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(64px, 10vw, 128px);
+    color: var(--text);
+    line-height: 1;
+    position: relative;
+  }
+
+  #widget-temp .temp-value sup {
+    font-family: 'Barlow', sans-serif;
+    font-size: 0.32em;
+    font-weight: 300;
+    vertical-align: super;
+    color: var(--muted);
+  }
+
+  /* animated arc behind temperature */
+  #widget-temp .arc-wrap {
+    position: absolute;
+    width: min(42vw, 300px);
+    height: min(42vw, 300px);
+    display: flex; align-items: center; justify-content: center;
+    pointer-events: none;
+  }
+
+  #widget-temp .arc-wrap svg {
+    position: absolute;
+    width: 100%; height: 100%;
+    transform: rotate(-90deg);
+    opacity: 0.25;
+  }
+
+  #temp-arc-path {
+    transition: stroke-dasharray 1.2s ease;
+  }
+
+  .light-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: clamp(10px, 1.5vw, 13px);
+    letter-spacing: 0.14em;
+    color: var(--muted);
+  }
+
+  .light-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: background 0.4s, box-shadow 0.4s;
+  }
+  .light-dot.bright {
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+  }
+
+  /* ── Curtain widget ──────────────────────────────────────────────────── */
+  #widget-curtains .curtain-btn {
+    width: clamp(120px, 18vw, 200px);
+    height: clamp(120px, 18vw, 200px);
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    background: var(--surface);
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    transition: border-color 0.3s, background 0.3s, box-shadow 0.3s, transform 0.1s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  #widget-curtains .curtain-btn::before {
+    content: '';
+    position: absolute; inset: 0; border-radius: 50%;
+    background: radial-gradient(circle at 40% 35%, rgba(255,255,255,0.04), transparent 70%);
+  }
+
+  #widget-curtains .curtain-btn.open {
+    border-color: var(--accent2);
+    box-shadow: 0 0 28px var(--glow2), inset 0 0 20px rgba(74,184,232,0.06);
+    background: rgba(74,184,232,0.07);
+  }
+
+  #widget-curtains .curtain-btn:active { transform: scale(0.96); }
+
+  .curtain-icon {
+    width: clamp(40px, 6vw, 64px);
+    height: clamp(40px, 6vw, 64px);
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .curtain-icon svg { width: 100%; height: 100%; }
+
+  .curtain-status {
+    font-size: clamp(9px, 1.3vw, 13px);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    transition: color 0.3s;
+  }
+  #widget-curtains .curtain-btn.open .curtain-status { color: var(--accent2); }
+
+  /* ── Lamp widget ──────────────────────────────────────────────────────── */
+  #widget-lamp .lamp-btn {
+    width: clamp(120px, 18vw, 200px);
+    height: clamp(120px, 18vw, 200px);
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    background: var(--surface);
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    transition: border-color 0.3s, background 0.3s, box-shadow 0.3s, transform 0.1s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  #widget-lamp .lamp-btn::before {
+    content: '';
+    position: absolute; inset: 0; border-radius: 50%;
+    background: radial-gradient(circle at 40% 35%, rgba(255,255,255,0.04), transparent 70%);
+  }
+
+  #widget-lamp .lamp-btn.on {
+    border-color: var(--accent);
+    box-shadow: 0 0 28px var(--glow), 0 0 60px rgba(232,200,74,0.08), inset 0 0 20px rgba(232,200,74,0.06);
+    background: rgba(232,200,74,0.06);
+  }
+
+  #widget-lamp .lamp-btn:active { transform: scale(0.96); }
+
+  .lamp-icon {
+    width: clamp(40px, 6vw, 64px);
+    height: clamp(40px, 6vw, 64px);
+  }
+
+  .lamp-icon svg { width: 100%; height: 100%; }
+
+  .lamp-rays {
+    position: absolute;
+    inset: -30%;
+    border-radius: 50%;
+    opacity: 0;
+    pointer-events: none;
+    background: radial-gradient(circle, rgba(232,200,74,0.12) 0%, transparent 70%);
+    transition: opacity 0.6s;
+  }
+
+  #widget-lamp .lamp-btn.on .lamp-rays { opacity: 1; }
+
+  .lamp-status {
+    font-size: clamp(9px, 1.3vw, 13px);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    transition: color 0.3s;
+  }
+  #widget-lamp .lamp-btn.on .lamp-status { color: var(--accent); }
+
+  /* ── Updated indicator ───────────────────────────────────────────────── */
+  #update-badge {
+    position: fixed;
+    bottom: 12px; right: 16px;
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    color: var(--muted);
+    opacity: 0.5;
+  }
+
+  /* ── Connection error banner ─────────────────────────────────────────── */
+  #error-banner {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    background: rgba(232, 74, 106, 0.9);
+    color: #fff;
+    text-align: center;
+    padding: 8px;
+    font-size: 13px;
+    letter-spacing: 0.1em;
+    z-index: 999;
+  }
+
+  /* ── Pulse animation for live dot ───────────────────────────────────── */
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  #live-dot {
+    display: inline-block;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent2);
+    animation: pulse 2s infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+    box-shadow: 0 0 6px var(--accent2);
+  }
+</style>
+</head>
+<body>
+
+<div id="error-banner">⚠ Нет соединения с сервером</div>
+
+<div id="app">
+
+  <!-- ── TOP: Clock ─────────────────────────────────────────────────── -->
+  <section id="clock-panel">
+    <div id="time">00:00:00</div>
+    <div id="date">Понедельник, 1 января 2025</div>
+    <div id="sensor-strip">
+      <div><span id="strip-temp">—</span>°C &nbsp;·&nbsp; температура</div>
+      <div><span id="live-dot"></span>онлайн</div>
+      <div>обновлено <span id="strip-updated">—</span></div>
+    </div>
+  </section>
+
+  <!-- ── BOTTOM: Widgets ────────────────────────────────────────────── -->
+  <section id="widgets">
+
+    <!-- Temperature -->
+    <div class="widget" id="widget-temp">
+      <div class="widget-label">Температура</div>
+      <div class="arc-wrap">
+        <svg viewBox="0 0 100 100">
+          <circle cx="50" cy="50" r="44"
+                  fill="none" stroke="#1e2530" stroke-width="3"/>
+          <circle cx="50" cy="50" r="44"
+                  fill="none" stroke="#e8c84a" stroke-width="3"
+                  stroke-linecap="round"
+                  id="temp-arc-path"
+                  stroke-dasharray="0 276.46"
+                  stroke-dashoffset="0"/>
+        </svg>
+        <div class="temp-value">
+          <span id="temp-display">—</span><sup>°C</sup>
+        </div>
+      </div>
+      <div style="height: min(42vw, 300px)"></div><!-- spacer for arc -->
+      <div class="light-indicator">
+        <div class="light-dot" id="light-dot"></div>
+        <span id="light-text">освещённость: —</span>
+      </div>
+    </div>
+
+    <!-- Curtains -->
+    <div class="widget" id="widget-curtains">
+      <div class="widget-label">Шторы</div>
+      <button class="curtain-btn" id="curtain-btn" onclick="toggleCurtains()">
+        <div class="curtain-icon">
+          <!-- curtain SVG icon -->
+          <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="4" y="4" width="3" height="40" rx="1.5" fill="#5a6475"/>
+            <rect x="41" y="4" width="3" height="40" rx="1.5" fill="#5a6475"/>
+            <path id="curtain-left"  d="M7 6 C7 6 14 10 14 24 C14 38 7 42 7 42Z" fill="#4ab8e8" opacity="0.7"/>
+            <path id="curtain-right" d="M41 6 C41 6 34 10 34 24 C34 38 41 42 41 42Z" fill="#4ab8e8" opacity="0.7"/>
+          </svg>
+        </div>
+        <span class="curtain-status" id="curtain-status">ЗАКРЫТЫ</span>
+      </button>
+    </div>
+
+    <!-- Lamp -->
+    <div class="widget" id="widget-lamp">
+      <div class="widget-label">Освещение</div>
+      <button class="lamp-btn" id="lamp-btn" onclick="toggleLamp()">
+        <div class="lamp-rays"></div>
+        <div class="lamp-icon">
+          <!-- bulb SVG icon -->
+          <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M24 6C16.268 6 10 12.268 10 20C10 25.522 13.09 30.327 17.6 32.874V38C17.6 38.884 18.316 39.6 19.2 39.6H28.8C29.684 39.6 30.4 38.884 30.4 38V32.874C34.91 30.327 38 25.522 38 20C38 12.268 31.732 6 24 6Z"
+                  fill="currentColor" id="bulb-body"/>
+            <rect x="19.2" y="41" width="9.6" height="1.8" rx="0.9" fill="currentColor"/>
+          </svg>
+        </div>
+        <span class="lamp-status" id="lamp-status">ВЫКЛ</span>
+      </button>
+    </div>
+
+  </section>
+</div>
+
+<div id="update-badge">обновление каждые 3 с</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+const state = {
+  temp:     null,
+  light:    false,
+  curtains: false,
+  lamp:     false,
+  updated:  '—'
+};
+
+// ── Clock ──────────────────────────────────────────────────────────────────
+const DAYS   = ['Воскресенье','Понедельник','Вторник','Среда','Четверг','Пятница','Суббота'];
+const MONTHS = ['января','февраля','марта','апреля','мая','июня',
+                'июля','августа','сентября','октября','ноября','декабря'];
+
+function pad(n) { return String(n).padStart(2,'0'); }
+
+function tickClock() {
+  const now = new Date();
+  document.getElementById('time').textContent =
+    `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+  document.getElementById('date').textContent =
+    `${DAYS[now.getDay()]}, ${now.getDate()} ${MONTHS[now.getMonth()]} ${now.getFullYear()}`;
+}
+setInterval(tickClock, 1000);
+tickClock();
+
+// ── Temperature arc ────────────────────────────────────────────────────────
+// Map temperature -10…+45 → 0…1 progress on circle (circumference ~276.46)
+const CIRC = 2 * Math.PI * 44; // ≈ 276.46
+
+function setTempArc(degC) {
+  const pct = Math.min(1, Math.max(0, (degC + 10) / 55));
+  const filled = pct * CIRC;
+  document.getElementById('temp-arc-path').setAttribute(
+    'stroke-dasharray', `${filled.toFixed(2)} ${(CIRC - filled).toFixed(2)}`
+  );
+}
+
+// ── Render UI from state ───────────────────────────────────────────────────
+function render() {
+  // Temperature
+  const tempEl = document.getElementById('temp-display');
+  const stripT  = document.getElementById('strip-temp');
+  if (state.temp !== null) {
+    const t = state.temp.toFixed(1);
+    tempEl.textContent  = t;
+    stripT.textContent  = t;
+    setTempArc(state.temp);
+  }
+
+  // Light sensor dot
+  const dot  = document.getElementById('light-dot');
+  const ltxt = document.getElementById('light-text');
+  dot.classList.toggle('bright', state.light);
+  ltxt.textContent = `освещённость: ${state.light ? 'высокая' : 'низкая'}`;
+
+  // Curtains button
+  const cBtn = document.getElementById('curtain-btn');
+  const cSt  = document.getElementById('curtain-status');
+  cBtn.classList.toggle('open', state.curtains);
+  cSt.textContent = state.curtains ? 'ОТКРЫТЫ' : 'ЗАКРЫТЫ';
+
+  // Lamp button
+  const lBtn   = document.getElementById('lamp-btn');
+  const lSt    = document.getElementById('lamp-status');
+  const bulb   = lBtn.querySelector('#bulb-body');
+  lBtn.classList.toggle('on', state.lamp);
+  lSt.textContent = state.lamp ? 'ВКЛ' : 'ВЫКЛ';
+  if (bulb) bulb.style.color = state.lamp ? '#e8c84a' : '#2c3340';
+
+  // Updated timestamp
+  document.getElementById('strip-updated').textContent = state.updated;
+}
+
+// ── Fetch sensors from backend ─────────────────────────────────────────────
+let fetchErrors = 0;
+
+async function fetchSensors() {
+  try {
+    const res  = await fetch('/api/sensors', { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    state.temp     = data.temperature;
+    state.light    = data.light;
+    state.curtains = data.curtains;
+    state.lamp     = data.lamp;
+    state.updated  = data.updated || '—';
+    fetchErrors = 0;
+    document.getElementById('error-banner').style.display = 'none';
+  } catch (e) {
+    fetchErrors++;
+    if (fetchErrors >= 2) {
+      document.getElementById('error-banner').style.display = 'block';
+    }
+  }
+  render();
+}
+
+setInterval(fetchSensors, 3000);
+fetchSensors();
+
+// ── Controls ───────────────────────────────────────────────────────────────
+async function toggleCurtains() {
+  try {
+    const res  = await fetch('/api/toggle/curtains', { method: 'POST' });
+    const data = await res.json();
+    state.curtains = data.state;
+    render();
+  } catch(e) { console.warn('curtains toggle failed', e); }
+}
+
+async function toggleLamp() {
+  try {
+    const res  = await fetch('/api/toggle/lamp', { method: 'POST' });
+    const data = await res.json();
+    state.lamp = data.state;
+    render();
+  } catch(e) { console.warn('lamp toggle failed', e); }
+}
+</script>
+</body>
+</html>
